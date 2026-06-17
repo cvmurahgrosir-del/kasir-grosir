@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kasir Murah Grosir</title>
     <style>
-        /* --- 1. CSS TAMPILAN UTAMA (SPLIT SCREEN) --- */
+        /* --- CSS TAMPILAN UTAMA --- */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
@@ -58,12 +58,12 @@
             font-size: 12px;
         }
 
-        /* --- 2. CSS KHUSUS MODE CETAK STRUK --- */
+        /* --- CSS MODE CETAK STRUK --- */
         @media print {
             body { display: block; }
             .area-katalog { display: none !important; }
             .area-keranjang { width: 100%; padding: 0; box-shadow: none; border: none; height: auto; }
-            button, input, label { display: none !important; }
+            button, input, label, #area-rekomendasi { display: none !important; }
         }
     </style>
 
@@ -86,6 +86,9 @@
             </ul>
         
         <hr>
+
+        <div id="area-rekomendasi" style="background-color: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; border: 1px solid #ffeeba; font-size: 14px; font-weight: bold;">
+            </div>
         
         <h3>Total: Rp <span id="total-harga">0</span></h3>
         
@@ -99,7 +102,7 @@
     </div>
 
     <script>
-        // Konfigurasi asli proyek Anda
+        // Konfigurasi Firebase Anda
         const firebaseConfig = {
             apiKey: "AIzaSyCSAjxai_W2DoUSubKaFOaR8VxhUZi7FP8",
             authDomain: "kasir-murah-grosir.firebaseapp.com",
@@ -110,12 +113,21 @@
             measurementId: "G-QZ19EV56B3"
         };
 
-        // Inisialisasi Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
         let totalBelanja = 0;
         let listBarangBelanjaan = [];
+
+        // ATURAN BUNDLING CERDAS (BARU)
+        const aturanBundling = {
+            "Beras Setra Ramos 5Kg": { 
+                pesan: "⭐ Promo Bundling: Tawarkan Minyak Goreng 1L ke pelanggan agar lebih hemat!" 
+            },
+            "Mie Instan Kuah": { 
+                pesan: "⭐ Jangan lupa tawarkan Gula Pasir atau telur untuk pelengkap." 
+            }
+        };
 
         function tambahKeKeranjang(namaBarang, hargaBarang) {
             let daftar = document.getElementById("daftar-keranjang");
@@ -145,8 +157,19 @@
 
             totalBelanja = totalBelanja + hargaBarang;
             document.getElementById("total-harga").innerText = totalBelanja;
-            
             listBarangBelanjaan.push(namaBarang);
+
+            // LOGIKA PEMICU POP-UP BUNDLING (BARU)
+            if (aturanBundling[namaBarang]) {
+                let kotakRekomendasi = document.getElementById("area-rekomendasi");
+                kotakRekomendasi.style.display = "block";
+                kotakRekomendasi.innerText = aturanBundling[namaBarang].pesan;
+                
+                // Pop-up akan hilang sendiri dalam 5 detik
+                setTimeout(function() {
+                    kotakRekomendasi.style.display = "none";
+                }, 5000);
+            }
         }
 
         function hitungKembalian() {
@@ -158,7 +181,6 @@
             } else {
                 document.getElementById("kembalian").innerText = uangKembalian;
 
-                // Menyiapkan paket data transaksi untuk pembukuan digital
                 let dataTransaksi = {
                     waktu: new Date().toLocaleString('id-ID'),
                     totalBelanja: totalBelanja,
@@ -167,16 +189,17 @@
                     itemDibeli: listBarangBelanjaan
                 };
 
-                // Kirim data transaksi secara real-time ke Cloud Firestore
                 db.collection("transaksi_kasir").add(dataTransaksi)
                 .then(function() {
-                    alert("Pembayaran Berhasil! Data telah tersimpan secara otomatis di sistem database.");
-                    
-                    // Kosongkan keranjang setelah sukses transaksi
+                    alert("Pembayaran Berhasil! Data tersimpan di sistem.");
                     document.getElementById("daftar-keranjang").innerHTML = "";
                     document.getElementById("uang-bayar").value = "";
                     document.getElementById("total-harga").innerText = "0";
                     document.getElementById("kembalian").innerText = "0";
+                    
+                    // Sembunyikan notifikasi bundling jika masih muncul
+                    document.getElementById("area-rekomendasi").style.display = "none";
+                    
                     totalBelanja = 0;
                     listBarangBelanjaan = [];
                 })
