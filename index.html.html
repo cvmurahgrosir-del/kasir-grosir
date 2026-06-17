@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kasir Murah Grosir</title>
+    <style>
+        /* --- 1. CSS TAMPILAN UTAMA (SPLIT SCREEN) --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            margin: 0;
+            background-color: #f8f9fa;
+        }
+        
+        .area-katalog {
+            width: 70%;
+            padding: 20px;
+            background-color: white;
+            border-right: 2px solid #e9ecef;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .area-keranjang {
+            width: 30%;
+            padding: 20px;
+            background-color: #ffffff;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.05);
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .tombol-produk {
+            background-color: #f1f3f5;
+            border: 1px solid #ced4da;
+            padding: 15px;
+            margin: 5px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.2s;
+        }
+
+        .tombol-produk:hover {
+            background-color: #e2e6ea;
+            border-color: #adb5bd;
+        }
+
+        .tombol-hapus {
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        /* --- 2. CSS KHUSUS MODE CETAK STRUK --- */
+        @media print {
+            body { display: block; }
+            .area-katalog { display: none !important; }
+            .area-keranjang { width: 100%; padding: 0; box-shadow: none; border: none; height: auto; }
+            button, input, label { display: none !important; }
+        }
+    </style>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+    <div class="area-katalog">
+        <h2>Katalog Toko</h2>
+        <button class="tombol-produk" onclick="tambahKeKeranjang('Minyak Goreng 1L', 15000)">Minyak Goreng 1L<br><b>Rp 15.000</b></button>
+        <button class="tombol-produk" onclick="tambahKeKeranjang('Gula Pasir 1Kg', 16000)">Gula Pasir 1Kg<br><b>Rp 16.000</b></button>
+        <button class="tombol-produk" onclick="tambahKeKeranjang('Beras Setra Ramos 5Kg', 70000)">Beras Setra Ramos 5Kg<br><b>Rp 70.000</b></button>
+        <button class="tombol-produk" onclick="tambahKeKeranjang('Mie Instan Kuah', 3000)">Mie Instan Kuah<br><b>Rp 3.000</b></button>
+    </div>
+
+    <div class="area-keranjang">
+        <h2>Keranjang Belanja</h2>
+        <ul id="daftar-keranjang" style="padding-left: 0; list-style: none;">
+            </ul>
+        
+        <hr>
+        
+        <h3>Total: Rp <span id="total-harga">0</span></h3>
+        
+        <label>Uang Bayar: Rp </label>
+        <input type="number" id="uang-bayar" placeholder="Nominal" style="width: 100px; padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+        
+        <button style="padding: 7px 15px; background-color: #20c997; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;" onclick="hitungKembalian()">Bayar</button>
+        <button style="padding: 7px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; margin-left: 5px;" onclick="window.print()">Cetak Struk</button>
+        
+        <h3 style="color: #2b8a3e;">Kembalian: Rp <span id="kembalian">0</span></h3>
+    </div>
+
+    <script>
+        // Konfigurasi asli proyek Anda
+        const firebaseConfig = {
+            apiKey: "AIzaSyCSAjxai_W2DoUSubKaFOaR8VxhUZi7FP8",
+            authDomain: "kasir-murah-grosir.firebaseapp.com",
+            projectId: "kasir-murah-grosir",
+            storageBucket: "kasir-murah-grosir.firebasestorage.app",
+            messagingSenderId: "596464268665",
+            appId: "1:596464268665:web:efce6cf10cf79834dbaba8",
+            measurementId: "G-QZ19EV56B3"
+        };
+
+        // Inisialisasi Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let totalBelanja = 0;
+        let listBarangBelanjaan = [];
+
+        function tambahKeKeranjang(namaBarang, hargaBarang) {
+            let daftar = document.getElementById("daftar-keranjang");
+            let itemBaru = document.createElement("li");
+            itemBaru.style.marginBottom = "10px"; 
+            
+            let teksBarang = document.createElement("span");
+            teksBarang.innerText = namaBarang + " - Rp " + hargaBarang;
+            
+            let tombolHapus = document.createElement("button");
+            tombolHapus.innerText = "Hapus";
+            tombolHapus.className = "tombol-hapus";
+            
+            tombolHapus.onclick = function() {
+                totalBelanja = totalBelanja - hargaBarang;
+                document.getElementById("total-harga").innerText = totalBelanja;
+                
+                let indeks = listBarangBelanjaan.indexOf(namaBarang);
+                if (indeks > -1) { listBarangBelanjaan.splice(indeks, 1); }
+                
+                daftar.removeChild(itemBaru);
+            };
+
+            itemBaru.appendChild(teksBarang);
+            itemBaru.appendChild(tombolHapus);
+            daftar.appendChild(itemBaru);
+
+            totalBelanja = totalBelanja + hargaBarang;
+            document.getElementById("total-harga").innerText = totalBelanja;
+            
+            listBarangBelanjaan.push(namaBarang);
+        }
+
+        function hitungKembalian() {
+            let uangPelanggan = document.getElementById("uang-bayar").value;
+            let uangKembalian = uangPelanggan - totalBelanja;
+
+            if (uangPelanggan === "" || uangKembalian < 0) {
+                alert("Maaf, uang pelanggan tidak cukup atau belum diisi!");
+            } else {
+                document.getElementById("kembalian").innerText = uangKembalian;
+
+                // Menyiapkan paket data transaksi untuk pembukuan digital
+                let dataTransaksi = {
+                    waktu: new Date().toLocaleString('id-ID'),
+                    totalBelanja: totalBelanja,
+                    uangBayar: Number(uangPelanggan),
+                    kembalian: uangKembalian,
+                    itemDibeli: listBarangBelanjaan
+                };
+
+                // Kirim data transaksi secara real-time ke Cloud Firestore
+                db.collection("transaksi_kasir").add(dataTransaksi)
+                .then(function() {
+                    alert("Pembayaran Berhasil! Data telah tersimpan secara otomatis di sistem database.");
+                    
+                    // Kosongkan keranjang setelah sukses transaksi
+                    document.getElementById("daftar-keranjang").innerHTML = "";
+                    document.getElementById("uang-bayar").value = "";
+                    document.getElementById("total-harga").innerText = "0";
+                    document.getElementById("kembalian").innerText = "0";
+                    totalBelanja = 0;
+                    listBarangBelanjaan = [];
+                })
+                .catch(function(error) {
+                    console.error("Gagal menyimpan data ke Firebase: ", error);
+                    alert("Terjadi kesalahan sistem saat mengunggah data pembukuan.");
+                });
+            }
+        }
+    </script>
+
+</body>
+</html>
